@@ -191,12 +191,13 @@ const ActivityItem: React.FC<{ activity: Activity }> = ({ activity }) => {
 
 const SimpleChart: React.FC<{ data: number[] }> = ({ data }) => {
   const chartWidth = SCREEN_WIDTH - PADDING_HORIZONTAL * 2 - 40;
-  const chartHeight = Math.min(SCREEN_HEIGHT * 0.25, 200);
+  const chartHeight = 180;
 
   if (!data || data.length === 0) {
     return (
-      <View style={{ height: chartHeight + 40, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ color: '#9CA3AF' }}>No data available</Text>
+      <View style={{ height: chartHeight + 60, alignItems: 'center', justifyContent: 'center' }}>
+        <Ionicons name="bar-chart-outline" size={48} color="#E5E7EB" />
+        <Text style={{ color: '#9CA3AF', marginTop: 12, fontSize: 14 }}>No data available</Text>
       </View>
     );
   }
@@ -206,33 +207,79 @@ const SimpleChart: React.FC<{ data: number[] }> = ({ data }) => {
     y: value || 0,
   }));
 
+  const maxValue = Math.max(...data);
+  const avgValue = Math.round(data.reduce((a, b) => a + b, 0) / data.length);
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
   return (
-    <View style={{ height: chartHeight + 40 }}>
-      <VictoryChart
-        width={chartWidth}
-        height={chartHeight}
-        padding={{ top: 20, bottom: 40, left: 50, right: 20 }}
-        style={{
-          parent: { touchAction: 'auto' }
-        }}
-      >
-        <VictoryArea
-          data={chartData}
-          style={{
-            data: {
-              fill: 'rgba(59, 130, 246, 0.15)',
-              stroke: '#3B82F6',
-              strokeWidth: 2.5,
-            },
-          }}
-          interpolation="monotoneX"
-        />
-      </VictoryChart>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-around', width: chartWidth, marginTop: -15, paddingHorizontal: 35 }}>
-        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-          <Text key={day} style={{ fontSize: 11, color: '#6B7280', fontWeight: '500' }}>
-            {day}
-          </Text>
+    <View>
+      {/* Stats Summary */}
+      <View style={{
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        marginBottom: 20,
+        paddingVertical: 12,
+        backgroundColor: '#F9FAFB',
+        borderRadius: 12,
+      }}>
+        <View style={{ alignItems: 'center' }}>
+          <Text style={{ fontSize: 12, color: '#6B7280', marginBottom: 4 }}>Average</Text>
+          <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#3B82F6' }}>{avgValue}%</Text>
+        </View>
+        <View style={{ width: 1, backgroundColor: '#E5E7EB' }} />
+        <View style={{ alignItems: 'center' }}>
+          <Text style={{ fontSize: 12, color: '#6B7280', marginBottom: 4 }}>Best Day</Text>
+          <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#10B981' }}>{maxValue}%</Text>
+        </View>
+      </View>
+
+      {/* Chart */}
+      <View style={{ marginBottom: 8 }}>
+        <VictoryChart
+          width={chartWidth}
+          height={chartHeight}
+          padding={{ top: 20, bottom: 45, left: 40, right: 20 }}
+          domainPadding={{ x: 15 }}
+        >
+          <VictoryArea
+            data={chartData}
+            style={{
+              data: {
+                fill: 'rgba(59, 130, 246, 0.2)',
+                stroke: '#3B82F6',
+                strokeWidth: 3,
+              },
+            }}
+            interpolation="catmullRom"
+          />
+        </VictoryChart>
+      </View>
+
+      {/* Day Labels with Values */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
+        {days.map((day, index) => (
+          <View key={day} style={{ alignItems: 'center', width: 40 }}>
+            <Text style={{
+              fontSize: 11,
+              color: data[index] === maxValue ? '#10B981' : '#6B7280',
+              fontWeight: data[index] === maxValue ? '700' : '500',
+              marginBottom: 6,
+            }}>
+              {day}
+            </Text>
+            <View style={{
+              backgroundColor: data[index] === maxValue ? '#10B981' : '#3B82F6',
+              paddingHorizontal: 8,
+              paddingVertical: 3,
+              borderRadius: 10,
+              minWidth: 36,
+              alignItems: 'center',
+            }}>
+              <Text style={{ fontSize: 10, color: 'white', fontWeight: '600' }}>
+                {data[index]}%
+              </Text>
+            </View>
+          </View>
         ))}
       </View>
     </View>
