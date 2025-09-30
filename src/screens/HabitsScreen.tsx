@@ -1,142 +1,263 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Dimensions,
+  RefreshControl,
+  Alert,
+  Share,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useHabitStore } from '../store/habitStore';
+import AddHabitModal from '../components/AddHabitModal';
+import HabitCard from '../components/HabitCard';
+import type { HabitsStackParamList } from '../navigation/HabitsStackNavigator';
 
-const MOCK_HABITS = [
-  { id: 1, name: 'Drink 8 glasses of water', completed: 6, total: 8, streak: 5, color: '#06B6D4' },
-  { id: 2, name: 'Morning workout', completed: 1, total: 1, streak: 12, color: '#8B5CF6' },
-  { id: 3, name: 'Read for 30 minutes', completed: 0, total: 1, streak: 3, color: '#10B981' },
-  { id: 4, name: 'Meditate', completed: 1, total: 1, streak: 8, color: '#F59E0B' },
-];
+const CATEGORIES = ['All', 'Health', 'Fitness', 'Mindfulness', 'Productivity'];
+
+type NavigationProp = NativeStackNavigationProp<HabitsStackParamList, 'HabitsList'>;
 
 export default function HabitsScreen() {
-  const [habits, setHabits] = useState(MOCK_HABITS);
+  const navigation = useNavigation<NavigationProp>();
+  const {
+    habits,
+    isLoading,
+    selectedCategory,
+    searchQuery,
+    initDatabase,
+    loadHabits,
+    completeHabit,
+    uncompleteHabit,
+    deleteHabit,
+    setSelectedCategory,
+    setSearchQuery,
+    exportData,
+  } = useHabitStore();
 
-  const toggleHabit = (id: number) => {
-    setHabits(habits.map(habit =>
-      habit.id === id
-        ? { ...habit, completed: habit.completed === habit.total ? 0 : habit.total }
-        : habit
-    ));
+  const [refreshing, setRefreshing] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  useEffect(() => {
+    const init = async () => {
+      await initDatabase();
+    };
+    init();
+  }, []);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadHabits();
+    setRefreshing(false);
   };
 
+  const handleComplete = async (habitId: number, todayCount: number, targetCount: number) => {
+    if (todayCount >= targetCount) {
+      await uncompleteHabit(habitId);
+    } else {
+      await completeHabit(habitId);
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      const data = await exportData();
+      await Share.share({
+        message: `Fitness Tracker - Habit Data Export\n\n${data}`,
+        title: 'Export Habit Data',
+      });
+    } catch (error) {
+      Alert.alert('Export Failed', 'Could not export data. Please try again.');
+    }
+  };
+
+  // Filter habits
+  const filteredHabits = habits.filter((habit) => {
+    const matchesCategory =
+      !selectedCategory || selectedCategory === 'All' || habit.category === selectedCategory;
+    const matchesSearch =
+      !searchQuery || habit.name.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
+
+  // Calculate today's stats
+  const todayCompleted = habits.filter((h) => h.todayCount >= h.targetCount).length;
+  const totalHabits = habits.length;
+  const completionRate = totalHabits > 0 ? Math.round((todayCompleted / totalHabits) * 100) : 0;
+
   return (
-    <SafeAreaView className="flex-1 bg-gray-50 dark:bg-gray-900">
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View className="px-6 pt-6 pb-4">
-          <Text className="text-3xl font-bold text-gray-900 dark:text-white">
-            Daily Habits 🎯
-          </Text>
-          <Text className="text-lg text-gray-600 dark:text-gray-300 mt-1">
-            Build consistency, one day at a time
-          </Text>
-        </View>
-
-        {/* Progress Overview */}
-        <View className="px-6 mb-6">
-          <View className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
-            <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-xl font-bold text-gray-900 dark:text-white">
-                Today's Progress
-              </Text>
-              <View className="bg-green-100 dark:bg-green-900/30 px-3 py-1 rounded-full">
-                <Text className="text-green-700 dark:text-green-300 font-semibold text-sm">
-                  75% Complete
-                </Text>
-              </View>
-            </View>
-
-            <View className="bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-2">
-              <View className="bg-green-500 h-3 rounded-full" style={{ width: '75%' }} />
-            </View>
-            <Text className="text-gray-500 dark:text-gray-400 text-sm">
-              3 of 4 habits completed today
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
+      {/* Header */}
+      <View style={{ paddingHorizontal: 24, paddingTop: 16, paddingBottom: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#111827' }}>
+              My Habits
+            </Text>
+            <Text style={{ fontSize: 14, color: '#6B7280', marginTop: 4 }}>
+              {todayCompleted} of {totalHabits} completed today ({completionRate}%)
             </Text>
           </View>
-        </View>
 
-        {/* Add New Habit Button */}
-        <View className="px-6 mb-6">
-          <TouchableOpacity className="bg-blue-500 rounded-2xl p-4 shadow-sm">
-            <View className="flex-row items-center justify-center">
-              <Ionicons name="add-circle" size={24} color="white" />
-              <Text className="text-white text-lg font-semibold ml-2">
-                Add New Habit
-              </Text>
-            </View>
-          </TouchableOpacity>
-        </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity
+              onPress={handleExport}
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                backgroundColor: 'white',
+                alignItems: 'center',
+                justifyContent: 'center',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 4,
+                elevation: 2,
+              }}
+            >
+              <Ionicons name="share-outline" size={24} color="#6B7280" />
+            </TouchableOpacity>
 
-        {/* Habits List */}
-        <View className="px-6 mb-24">
-          <Text className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-            Your Habits
-          </Text>
-
-          <View className="space-y-3">
-            {habits.map((habit) => (
-              <TouchableOpacity
-                key={habit.id}
-                onPress={() => toggleHabit(habit.id)}
-                className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm"
-              >
-                <View className="flex-row items-center justify-between">
-                  <View className="flex-1">
-                    <View className="flex-row items-center mb-2">
-                      <View
-                        className="w-4 h-4 rounded-full mr-3"
-                        style={{ backgroundColor: habit.color }}
-                      />
-                      <Text className="font-semibold text-gray-900 dark:text-white flex-1">
-                        {habit.name}
-                      </Text>
-                      <View className="flex-row items-center">
-                        <Ionicons name="flame" size={16} color="#F59E0B" />
-                        <Text className="text-orange-500 font-semibold ml-1">
-                          {habit.streak}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View className="flex-row items-center justify-between">
-                      <View className="flex-1 mr-4">
-                        <View className="bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                          <View
-                            className="h-2 rounded-full"
-                            style={{
-                              backgroundColor: habit.color,
-                              width: `${(habit.completed / habit.total) * 100}%`
-                            }}
-                          />
-                        </View>
-                      </View>
-                      <Text className="text-gray-500 dark:text-gray-400 text-sm">
-                        {habit.completed}/{habit.total}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View className="ml-4">
-                    <View
-                      className={`w-8 h-8 rounded-full items-center justify-center ${
-                        habit.completed === habit.total
-                          ? 'bg-green-500'
-                          : 'bg-gray-200 dark:bg-gray-700'
-                      }`}
-                    >
-                      {habit.completed === habit.total && (
-                        <Ionicons name="checkmark" size={16} color="white" />
-                      )}
-                    </View>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))}
+            <TouchableOpacity
+              onPress={() => setShowAddModal(true)}
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                backgroundColor: '#3B82F6',
+                alignItems: 'center',
+                justifyContent: 'center',
+                shadowColor: '#3B82F6',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+                elevation: 4,
+              }}
+            >
+              <Ionicons name="add" size={28} color="white" />
+            </TouchableOpacity>
           </View>
         </View>
+
+        {/* Search Bar */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: 'white',
+            borderRadius: 12,
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            marginBottom: 16,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.05,
+            shadowRadius: 4,
+            elevation: 2,
+          }}
+        >
+          <Ionicons name="search" size={20} color="#9CA3AF" />
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search habits..."
+            placeholderTextColor="#9CA3AF"
+            style={{ flex: 1, marginLeft: 12, fontSize: 15, color: '#111827' }}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Category Filters */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+          {CATEGORIES.map((category) => {
+            const isSelected = category === 'All' ? !selectedCategory : selectedCategory === category;
+            return (
+              <TouchableOpacity
+                key={category}
+                onPress={() => setSelectedCategory(category === 'All' ? null : category)}
+                style={{
+                  paddingHorizontal: 20,
+                  paddingVertical: 10,
+                  borderRadius: 20,
+                  backgroundColor: isSelected ? '#3B82F6' : 'white',
+                  marginRight: 8,
+                  borderWidth: 1,
+                  borderColor: isSelected ? '#3B82F6' : '#E5E7EB',
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: '600',
+                    color: isSelected ? 'white' : '#6B7280',
+                  }}
+                >
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* Habits List */}
+      <ScrollView
+        style={{ flex: 1, paddingHorizontal: 24 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+      >
+        {filteredHabits.length === 0 ? (
+          <View style={{ alignItems: 'center', paddingVertical: 60 }}>
+            <Ionicons name="list-outline" size={64} color="#E5E7EB" />
+            <Text style={{ fontSize: 16, color: '#9CA3AF', marginTop: 16 }}>
+              {searchQuery || selectedCategory ? 'No habits found' : 'No habits yet'}
+            </Text>
+            <Text style={{ fontSize: 14, color: '#9CA3AF', marginTop: 8 }}>
+              {searchQuery || selectedCategory ? 'Try a different filter' : 'Tap + to add your first habit'}
+            </Text>
+          </View>
+        ) : (
+          filteredHabits.map((habit) => (
+            <HabitCard
+              key={habit.id}
+              habit={habit}
+              onPress={() => {
+                navigation.navigate('HabitDetail', { habit });
+              }}
+              onComplete={() => handleComplete(habit.id, habit.todayCount, habit.targetCount)}
+              onDelete={() => {
+                Alert.alert(
+                  'Delete Habit',
+                  `Are you sure you want to delete "${habit.name}"?`,
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Delete',
+                      style: 'destructive',
+                      onPress: () => deleteHabit(habit.id),
+                    },
+                  ]
+                );
+              }}
+            />
+          ))
+        )}
+
+        <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Add Habit Modal */}
+      <AddHabitModal visible={showAddModal} onClose={() => setShowAddModal(false)} />
     </SafeAreaView>
   );
 }

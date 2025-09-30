@@ -7,7 +7,7 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import DashboardScreen from '../screens/DashboardScreen';
-import HabitsScreen from '../screens/HabitsScreen';
+import HabitsStackNavigator from './HabitsStackNavigator';
 import WorkoutsScreen from '../screens/WorkoutsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 
@@ -128,7 +128,7 @@ export default function AppNavigator() {
         }}
       >
         <Tab.Screen name="Dashboard" component={DashboardScreen} />
-        <Tab.Screen name="Habits" component={HabitsScreen} />
+        <Tab.Screen name="Habits" component={HabitsStackNavigator} />
         <Tab.Screen name="Workouts" component={WorkoutsScreen} />
         <Tab.Screen name="Profile" component={ProfileScreen} />
       </Tab.Navigator>
